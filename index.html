@@ -1,0 +1,444 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a" id="theme-color-meta">
+  <title>Hybrid AI Assistant</title>
+  
+  <link rel="manifest" href="data:application/manifest+json,{
+    &quot;name&quot;: &quot;Hybrid AI&quot;,
+    &quot;short_name&quot;: &quot;AI&quot;,
+    &quot;start_url&quot;: &quot;.&quot;,
+    &quot;display&quot;: &quot;standalone&quot;,
+    &quot;background_color&quot;: &quot;#0f172a&quot;,
+    &quot;theme_color&quot;: &quot;#0f172a&quot;,
+    &quot;icons&quot;: [{
+      &quot;src&quot;: &quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>&quot;,
+      &quot;sizes&quot;: &quot;100x100&quot;,
+      &quot;type&quot;: &quot;image/svg+xml&quot;
+    }]
+  }">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: { extend: { animation: { 'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite', } } }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
+    .glass { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .light .glass { background: rgba(255, 255, 255, 0.85); }
+    .typing-dot { animation: typing 1.4s infinite ease-in-out both; }
+    .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+    .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+    @keyframes typing { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 h-screen flex flex-col font-sans transition-colors duration-300 overflow-hidden">
+
+  <!-- Header -->
+  <header class="glass z-10 w-full px-4 py-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-800 shadow-sm absolute top-0 transition-colors">
+    <div class="flex items-center gap-3">
+      <div class="bg-indigo-600 p-2 rounded-xl text-white shadow-md">
+        <i data-lucide="zap" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">Hybrid AI</h1>
+        <p id="systemStatus" class="text-xs text-emerald-500 font-medium flex items-center gap-1">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> Systems Online
+        </p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <div id="batteryContainer" class="flex items-center gap-1 text-sm font-medium opacity-80" title="Battery Status">
+        <i data-lucide="battery" class="w-4 h-4"></i><span id="batteryIndicator">--%</span>
+      </div>
+      <button id="themeToggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors" title="Toggle Theme">
+        <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-amber-400"></i>
+        <i data-lucide="moon" class="w-5 h-5 block dark:hidden text-indigo-600"></i>
+      </button>
+      <button id="clearMemBtn" class="p-2 rounded-full hover:bg-red-100 hover:text-red-600 dark:hover:bg-red-900/30 dark:hover:text-red-400 transition-colors" title="Clear Memory">
+        <i data-lucide="trash-2" class="w-5 h-5"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Chat Area -->
+  <main id="chat" class="flex-1 overflow-y-auto p-4 pt-20 pb-24 space-y-5 flex flex-col scroll-smooth">
+    <!-- Messages injected here -->
+  </main>
+
+  <!-- Input Area -->
+  <footer class="absolute bottom-0 w-full p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-900 dark:via-slate-900 transition-colors z-20">
+    <div class="max-w-3xl mx-auto flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-2xl shadow-lg border border-slate-200 dark:border-slate-700 relative">
+      <button id="voiceBtn" class="p-3 rounded-xl text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all relative group" title="Tap to talk">
+        <i data-lucide="mic" class="w-6 h-6 z-10 relative"></i>
+        <span id="voiceRipple" class="absolute inset-0 rounded-xl bg-red-500 opacity-0 transition-opacity"></span>
+      </button>
+      
+      <input id="textInput" type="text" autocomplete="off" placeholder="Ask anything or use local commands..." class="flex-1 bg-transparent border-none outline-none px-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500">
+      
+      <button id="sendBtn" class="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" disabled>
+        <i data-lucide="arrow-up" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div class="text-center mt-2 flex justify-center gap-4 text-[10px] text-slate-400 dark:text-slate-500 font-medium tracking-wide">
+      <span><span class="text-indigo-500">⚡</span> Cloud LLM</span>
+      <span><span class="text-emerald-500">⚡</span> Local Router</span>
+    </div>
+  </footer>
+
+  <script>
+    // ---------- CONFIG & STATE ----------
+    const apiKey = ""; // Cloud LLM Key provided by runtime environment
+    let conversationHistory = []; 
+    const DB_NAME = 'HybridAssistantDB';
+    let db;
+
+    // UI Elements
+    const chat = document.getElementById('chat');
+    const textInput = document.getElementById('textInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const voiceBtn = document.getElementById('voiceBtn');
+    const voiceRipple = document.getElementById('voiceRipple');
+    const themeToggle = document.getElementById('themeToggle');
+    const clearMemBtn = document.getElementById('clearMemBtn');
+
+    lucide.createIcons();
+
+    // ---------- SYSTEM INSTRUCTION FOR LLM ----------
+    const systemPrompt = `You are a highly capable, concise, and helpful AI assistant. 
+    You have conversational memory. Keep answers brief and direct unless asked for details. 
+    Use markdown for formatting. Do not hallucinate device capabilities.`;
+
+    // ---------- THEME TOGGLE ----------
+    const html = document.documentElement;
+    themeToggle.onclick = () => {
+      html.classList.toggle('dark');
+      html.classList.toggle('light');
+    };
+
+    // ---------- INDEXEDDB (PERSISTENT MEMORY) ----------
+    function initDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 2);
+        req.onupgradeneeded = (e) => {
+          db = e.target.result;
+          if (!db.objectStoreNames.contains('memory')) db.createObjectStore('memory', { keyPath: 'id' });
+        };
+        req.onsuccess = (e) => { db = e.target.result; resolve(); };
+        req.onerror = reject;
+      });
+    }
+
+    async function saveMemory() {
+      if (!db) return;
+      const tx = db.transaction('memory', 'readwrite');
+      // Keep only last 20 messages to prevent context explosion
+      const recentHistory = conversationHistory.slice(-20);
+      tx.objectStore('memory').put({ id: 'chat_history', data: recentHistory });
+    }
+
+    async function loadMemory() {
+      if (!db) return;
+      return new Promise((resolve) => {
+        const tx = db.transaction('memory', 'readonly');
+        const req = tx.objectStore('memory').get('chat_history');
+        req.onsuccess = () => {
+          if (req.result && req.result.data) {
+            conversationHistory = req.result.data;
+            // Re-render history on screen
+            conversationHistory.forEach(msg => {
+              if (msg.role === 'user') renderMessage(msg.parts[0].text, 'user', false);
+              else if (msg.role === 'model') renderMessage(msg.parts[0].text, 'assistant', false);
+            });
+            if (conversationHistory.length > 0) scrollChat();
+          }
+          resolve();
+        };
+      });
+    }
+
+    // ---------- UI RENDERING ----------
+    function renderMessage(text, sender, animate = true) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `flex w-full ${sender === 'user' ? 'justify-end' : 'justify-start'} ${animate ? 'animate-[fadeIn_0.3s_ease-out]' : ''}`;
+      
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[85%] p-3.5 rounded-2xl text-sm md:text-base leading-relaxed shadow-sm ${
+        sender === 'user' 
+          ? 'bg-indigo-600 text-white rounded-br-sm' 
+          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-sm border border-slate-100 dark:border-slate-700'
+      }`;
+      
+      // Basic markdown parsing (Bold, lists, line breaks)
+      let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-indigo-200 dark:text-indigo-400">$1</strong>');
+      formattedText = formattedText.replace(/\*(.*?)\*/g, '<em>$1</em>');
+      formattedText = formattedText.replace(/\n/g, '<br>');
+      
+      bubble.innerHTML = formattedText;
+      wrapper.appendChild(bubble);
+      chat.appendChild(wrapper);
+      scrollChat();
+      return bubble;
+    }
+
+    function renderTypingIndicator() {
+      const wrapper = document.createElement('div');
+      wrapper.id = 'typingIndicator';
+      wrapper.className = 'flex w-full justify-start animate-[fadeIn_0.3s_ease-out]';
+      wrapper.innerHTML = `
+        <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-bl-sm border border-slate-100 dark:border-slate-700 flex gap-1 items-center h-12 shadow-sm">
+          <div class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 typing-dot"></div>
+          <div class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 typing-dot"></div>
+          <div class="w-2 h-2 rounded-full bg-slate-400 dark:bg-slate-500 typing-dot"></div>
+        </div>
+      `;
+      chat.appendChild(wrapper);
+      scrollChat();
+    }
+
+    function removeTypingIndicator() {
+      const indicator = document.getElementById('typingIndicator');
+      if (indicator) indicator.remove();
+    }
+
+    function scrollChat() {
+      setTimeout(() => chat.scrollTop = chat.scrollHeight, 50);
+    }
+
+    // ---------- LAYER 1: LOCAL HEURISTIC ROUTER ----------
+    // Zero-compute layer for device-specific commands
+    async function handleLocalCommand(text) {
+      const lower = text.toLowerCase().trim();
+      
+      if (lower.match(/^(what\s*time\s*is\s*it|time|date|today)$/i)) {
+        const now = new Date();
+        return `🕒 It's **${now.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}** on ${now.toLocaleDateString([], {weekday:'long', month:'short', day:'numeric'})}.`;
+      }
+      
+      if (lower.match(/^(battery|power\s*level|charge)$/i)) {
+        if ('getBattery' in navigator) {
+          const battery = await navigator.getBattery();
+          return `🔋 Battery is at **${Math.round(battery.level * 100)}%** (${battery.charging ? 'Charging' : 'Not charging'}).`;
+        }
+        return "⚠️ Battery API is not supported on this device/browser.";
+      }
+
+      if (lower.match(/^(clear\s*memory|forget\s*everything|reset)$/i)) {
+        conversationHistory = [];
+        await saveMemory();
+        chat.innerHTML = '';
+        return "🧹 Memory cleared. I've forgotten our previous conversation.";
+      }
+
+      return null; // Null means it needs LLM routing
+    }
+
+    // ---------- LAYER 2: CLOUD LLM (GEMINI) ----------
+    async function callLLM(userText) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+      
+      // Append user message to history temporarily for the request
+      const requestContents = [...conversationHistory, { role: "user", parts: [{ text: userText }] }];
+
+      const payload = {
+        contents: requestContents,
+        systemInstruction: { parts: [{ text: systemPrompt }] },
+        tools: [{ "google_search": {} }] // Enable grounding for real-time questions
+      };
+
+      let retries = 5;
+      let delay = 1000;
+      
+      while (retries > 0) {
+        try {
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+          
+          const data = await response.json();
+          const llmReply = data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response.";
+          
+          // Only if successful, push to actual memory array
+          conversationHistory.push({ role: "user", parts: [{ text: userText }] });
+          conversationHistory.push({ role: "model", parts: [{ text: llmReply }] });
+          saveMemory();
+          
+          return llmReply;
+          
+        } catch (error) {
+          retries--;
+          if (retries === 0) {
+            console.error("LLM Error:", error);
+            return "⚠️ System error connecting to the intelligence core. Please check network connection and try again later.";
+          }
+          await new Promise(res => setTimeout(res, delay));
+          delay *= 2; // Exponential backoff
+        }
+      }
+    }
+
+    // ---------- CORE PROCESSING PIPELINE ----------
+    async function processInput(text) {
+      if (!text.trim()) return;
+      
+      // 1. Render User Input
+      renderMessage(text, 'user');
+      
+      // 2. Check Layer 1 (Local Regex/Device APIs)
+      const localResponse = await handleLocalCommand(text);
+      
+      if (localResponse) {
+        // Handled locally (Instant)
+        renderMessage(localResponse, 'assistant');
+        speak(localResponse.replace(/\*\*/g, '').replace(/[^\w\s.,!?']/g, ''));
+      } else {
+        // Handled via Layer 2 (LLM)
+        renderTypingIndicator();
+        const llmResponse = await callLLM(text);
+        removeTypingIndicator();
+        renderMessage(llmResponse, 'assistant');
+        // Basic speech cleanup
+        speak(llmResponse.replace(/\*\*/g, '').replace(/[^\w\s.,!?']/g, '')); 
+      }
+    }
+
+    // ---------- VOICE RECOGNITION (TAP TO TALK) ----------
+    let recognition;
+    function initSpeech() {
+      const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRec) {
+        voiceBtn.style.display = 'none';
+        return;
+      }
+      recognition = new SpeechRec();
+      recognition.continuous = false; // Intentional push-to-talk to save battery
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      recognition.onstart = () => {
+        voiceBtn.classList.add('text-red-500');
+        voiceRipple.classList.add('animate-pulse-fast', 'opacity-20');
+        textInput.placeholder = "Listening...";
+      };
+
+      recognition.onresult = (e) => {
+        let transcript = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          transcript += e.results[i][0].transcript;
+        }
+        textInput.value = transcript;
+        if (e.results[0].isFinal) {
+          textInput.placeholder = "Ask anything or use local commands...";
+          stopListening();
+          processInput(transcript);
+          textInput.value = '';
+        }
+      };
+
+      recognition.onerror = (e) => { stopListening(); };
+      recognition.onend = () => { stopListening(); };
+    }
+
+    function startListening() {
+      if (!recognition) return;
+      try { recognition.start(); } catch(e){}
+    }
+    
+    function stopListening() {
+      if (!recognition) return;
+      try { recognition.stop(); } catch(e){}
+      voiceBtn.classList.remove('text-red-500');
+      voiceRipple.classList.remove('animate-pulse-fast', 'opacity-20');
+      textInput.placeholder = "Ask anything or use local commands...";
+    }
+
+    voiceBtn.addEventListener('mousedown', startListening);
+    voiceBtn.addEventListener('touchstart', startListening, {passive: true});
+
+    // ---------- TEXT TO SPEECH ----------
+    function speak(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      // Heuristic: Don't speak super long Markdown chunks, it sounds robotic.
+      if (text.length > 250) text = "Here is the information you requested."; 
+      
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.05;
+      
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(v => v.lang.includes('en') && (v.name.includes('Female') || v.name.includes('Google') || v.name.includes('Samantha')));
+      if (preferred) utter.voice = preferred;
+
+      window.speechSynthesis.speak(utter);
+    }
+    if ('speechSynthesis' in window) window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+
+
+    // ---------- EVENT LISTENERS & INIT ----------
+    textInput.addEventListener('input', () => sendBtn.disabled = textInput.value.trim().length === 0);
+
+    sendBtn.onclick = () => {
+      const msg = textInput.value;
+      textInput.value = '';
+      sendBtn.disabled = true;
+      processInput(msg);
+    };
+
+    textInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && textInput.value.trim().length > 0) sendBtn.click();
+    });
+
+    clearMemBtn.onclick = async () => {
+       if(confirm("Clear all conversation history?")) {
+         await handleLocalCommand('clear memory');
+       }
+    };
+
+    // Battery Monitor
+    if ('getBattery' in navigator) {
+      navigator.getBattery().then(battery => {
+        const update = () => document.getElementById('batteryIndicator').textContent = `${Math.round(battery.level * 100)}%`;
+        update();
+        battery.addEventListener('levelchange', update);
+      });
+    }
+
+    async function init() {
+      initSpeech();
+      await initDB();
+      await loadMemory();
+      
+      if (conversationHistory.length === 0) {
+        setTimeout(() => {
+          renderMessage("👋 Hello. I'm your hybrid assistant. I handle local device tasks instantly, and route complex reasoning to the cloud. How can I help?", 'assistant');
+        }, 300);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>
+
+
+```
