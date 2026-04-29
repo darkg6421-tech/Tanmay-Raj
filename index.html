@@ -1,0 +1,682 @@
+```html
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0f172a" id="theme-color-meta">
+  <title>On-Device AI Assistant</title>
+  
+  <!-- PWA Manifest (inline) -->
+  <link rel="manifest" href="data:application/manifest+json,{
+    &quot;name&quot;: &quot;My AI&quot;,
+    &quot;short_name&quot;: &quot;AI&quot;,
+    &quot;start_url&quot;: &quot;.&quot;,
+    &quot;display&quot;: &quot;standalone&quot;,
+    &quot;background_color&quot;: &quot;#0f172a&quot;,
+    &quot;theme_color&quot;: &quot;#0f172a&quot;,
+    &quot;icons&quot;: [{
+      &quot;src&quot;: &quot;data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>&quot;,
+      &quot;sizes&quot;: &quot;100x100&quot;,
+      &quot;type&quot;: &quot;image/svg+xml&quot;
+    }]
+  }">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          animation: {
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    /* Custom Scrollbar for a cleaner look */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background-color: #4b5563; border-radius: 10px; }
+    
+    .glass-header {
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .light .glass-header {
+      background: rgba(255, 255, 255, 0.85);
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-900 dark:text-slate-100 h-screen flex flex-col font-sans transition-colors duration-300 overflow-hidden">
+
+  <!-- Header -->
+  <header class="glass-header z-10 w-full px-4 py-3 flex justify-between items-center border-b border-slate-200 dark:border-slate-800 shadow-sm transition-colors duration-300 absolute top-0">
+    <div class="flex items-center gap-2">
+      <div class="bg-indigo-600 p-2 rounded-full text-white shadow-md">
+        <i data-lucide="brain-circuit" class="w-5 h-5"></i>
+      </div>
+      <div>
+        <h1 class="font-bold text-lg leading-tight">My AI</h1>
+        <p id="modelStatus" class="text-xs text-slate-500 dark:text-slate-400 font-medium">⚡ Initializing...</p>
+      </div>
+    </div>
+    
+    <div class="flex items-center gap-4">
+      <div id="batteryContainer" class="flex items-center gap-1 text-sm font-medium opacity-80" title="Battery Status">
+        <i data-lucide="battery" class="w-4 h-4"></i>
+        <span id="batteryIndicator">--%</span>
+      </div>
+      <button id="themeToggle" class="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors" title="Toggle Theme">
+        <i data-lucide="sun" class="w-5 h-5 hidden dark:block text-amber-400"></i>
+        <i data-lucide="moon" class="w-5 h-5 block dark:hidden text-indigo-600"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Progress Bar (Visible only during model load) -->
+  <div id="progressContainer" class="absolute top-[60px] left-0 w-full h-1 bg-slate-200 dark:bg-slate-800 z-10 hidden">
+    <div id="progressBar" class="h-full bg-indigo-500 transition-all duration-300" style="width: 0%"></div>
+  </div>
+
+  <!-- Chat Area -->
+  <main id="chat" class="flex-1 overflow-y-auto p-4 pt-20 pb-24 space-y-4 flex flex-col scroll-smooth">
+    <!-- Messages will be injected here -->
+  </main>
+
+  <!-- Input Area -->
+  <footer class="absolute bottom-0 w-full p-4 bg-gradient-to-t from-slate-50 via-slate-50 to-transparent dark:from-slate-900 dark:via-slate-900 transition-colors duration-300">
+    <div class="max-w-3xl mx-auto flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-full shadow-lg border border-slate-200 dark:border-slate-700 transition-colors duration-300 relative">
+      <button id="voiceBtn" class="p-3 rounded-full text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-700 transition-all relative group" title="Tap to talk (Say 'Hey AI')">
+        <i data-lucide="mic" class="w-6 h-6 z-10 relative"></i>
+        <span id="voiceRipple" class="absolute inset-0 rounded-full bg-red-500 opacity-0 transition-opacity"></span>
+      </button>
+      
+      <input id="textInput" type="text" placeholder="Type or say 'Hey AI'..." class="flex-1 bg-transparent border-none outline-none px-2 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500">
+      
+      <button id="sendBtn" class="p-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-md transition-transform hover:scale-105 active:scale-95 disabled:opacity-50 disabled:hover:scale-100" disabled>
+        <i data-lucide="send" class="w-5 h-5"></i>
+      </button>
+    </div>
+    <div class="text-center mt-2">
+      <p class="text-[10px] text-slate-400 dark:text-slate-500">Model runs entirely on your device. No data is sent to the cloud.</p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script type="module">
+    import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+
+    // Disable local model loading, only use CDN
+    env.allowLocalModels = false;
+
+    // ---------- GLOBALS & UI ELEMENTS ----------
+    let classifier = null;
+    const chat = document.getElementById('chat');
+    const textInput = document.getElementById('textInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const voiceBtn = document.getElementById('voiceBtn');
+    const voiceRipple = document.getElementById('voiceRipple');
+    const modelStatus = document.getElementById('modelStatus');
+    const batteryIndicator = document.getElementById('batteryIndicator');
+    const themeToggle = document.getElementById('themeToggle');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    
+    // Initialize Lucide Icons
+    lucide.createIcons();
+
+    // ---------- THEME MANAGEMENT ----------
+    const html = document.documentElement;
+    const themeMeta = document.getElementById('theme-color-meta');
+    
+    function toggleTheme() {
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        html.classList.add('light'); // For CSS specific targeting if needed
+        themeMeta.setAttribute('content', '#f8fafc');
+      } else {
+        html.classList.add('dark');
+        html.classList.remove('light');
+        themeMeta.setAttribute('content', '#0f172a');
+      }
+    }
+    
+    themeToggle.onclick = toggleTheme;
+
+    // ---------- INDEXEDDB UTILS ----------
+    const DB_NAME = 'AIAssistantDB';
+    const DB_VERSION = 1;
+    let db;
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, DB_VERSION);
+        request.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains('tasks')) db.createObjectStore('tasks', { keyPath: 'id', autoIncrement: true });
+          if (!db.objectStoreNames.contains('notes')) db.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
+          if (!db.objectStoreNames.contains('reminders')) db.createObjectStore('reminders', { keyPath: 'id', autoIncrement: true });
+        };
+        request.onsuccess = (e) => { db = e.target.result; resolve(db); };
+        request.onerror = () => reject('IndexedDB error');
+      });
+    }
+
+    async function dbAdd(storeName, data) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const req = store.add(data);
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = reject;
+      });
+    }
+
+    async function dbClear(storeName) {
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        const req = store.clear();
+        req.onsuccess = resolve;
+        req.onerror = reject;
+      });
+    }
+
+    // ---------- SERVICE WORKER ----------
+    async function registerSW() {
+      if ('serviceWorker' in navigator) {
+        const swBlob = new Blob([`
+          self.addEventListener('install', (e) => self.skipWaiting());
+          self.addEventListener('activate', (e) => e.waitUntil(clients.claim()));
+          self.addEventListener('sync', (e) => {
+            if (e.tag.startsWith('reminder-')) {
+              const id = parseInt(e.tag.split('-')[1]);
+              e.waitUntil(
+                clients.matchAll().then(clients => {
+                  if (clients.length > 0) {
+                    clients[0].postMessage({ type: 'reminder-triggered', id });
+                  } else {
+                    self.registration.showNotification('AI Reminder', {
+                      body: 'Your scheduled reminder.',
+                      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">🔔</text></svg>',
+                    });
+                  }
+                })
+              );
+            }
+          });
+          self.addEventListener('notificationclick', (e) => {
+            e.notification.close();
+            e.waitUntil(clients.openWindow('.'));
+          });
+        `], { type: 'application/javascript' });
+        
+        try {
+          const swURL = URL.createObjectURL(swBlob);
+          await navigator.serviceWorker.register(swURL);
+          console.log('Service Worker Registered');
+        } catch (e) {
+          console.warn('SW registration failed', e);
+        }
+      }
+    }
+
+    // ---------- UI: CHAT MESSAGES ----------
+    function addMessage(text, sender) {
+      const wrapper = document.createElement('div');
+      wrapper.className = `flex w-full ${sender === 'user' ? 'justify-end' : 'justify-start'}`;
+      
+      const bubble = document.createElement('div');
+      bubble.className = `max-w-[85%] p-3 rounded-2xl text-sm md:text-base leading-relaxed shadow-sm animate-[fadeIn_0.3s_ease-out] ${
+        sender === 'user' 
+          ? 'bg-indigo-600 text-white rounded-br-sm' 
+          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-sm border border-slate-100 dark:border-slate-700'
+      }`;
+      
+      // Basic markdown-like rendering for bold text
+      const formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+      bubble.innerHTML = formattedText;
+      
+      wrapper.appendChild(bubble);
+      chat.appendChild(wrapper);
+      
+      // Smooth scroll to bottom
+      setTimeout(() => {
+        chat.scrollTop = chat.scrollHeight;
+      }, 50);
+    }
+
+    // ---------- TEXT TO SPEECH ----------
+    function speak(text) {
+      if (!('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      // Remove emojis and special formatting before speaking
+      const cleanText = text.replace(/([\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF])/g, '').replace(/\*/g, '');
+      const utter = new SpeechSynthesisUtterance(cleanText);
+      utter.lang = 'en-US';
+      utter.rate = 1.05;
+      utter.pitch = 1.1;
+      
+      // Try to find a good female English voice if available
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Female') || v.name.includes('Google') || v.name.includes('Samantha')));
+      if (preferredVoice) utter.voice = preferredVoice;
+
+      window.speechSynthesis.speak(utter);
+    }
+
+    // Load voices proactively
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+    }
+
+    // ---------- VOICE RECOGNITION (Wake word) ----------
+    let recognition;
+    let isListening = false;
+    const wakeWord = /hey\s*ai/i;
+
+    function initRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        voiceBtn.style.display = 'none';
+        return;
+      }
+      
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      
+      recognition.onresult = (event) => {
+        let transcript = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        transcript = transcript.trim();
+        
+        // Visual feedback during speech
+        if(transcript) textInput.placeholder = `Listening: ${transcript}...`;
+        
+        if (event.results[event.results.length-1].isFinal) {
+          textInput.placeholder = "Type or say 'Hey AI'...";
+          if (wakeWord.test(transcript)) {
+             const cmd = transcript.replace(wakeWord, '').trim();
+             if (cmd) {
+               addMessage(cmd, 'user');
+               processMessage(cmd);
+             } else {
+               addMessage("I'm listening. How can I help?", 'assistant');
+               speak("I'm listening. How can I help?");
+             }
+          } else if (document.activeElement !== textInput && transcript.length > 2) {
+             // If user just clicks mic and speaks without wake word
+             addMessage(transcript, 'user');
+             processMessage(transcript);
+          }
+        }
+      };
+
+      recognition.onerror = (e) => {
+        if (e.error === 'no-speech') return;
+        console.warn('Speech recognition error', e.error);
+        stopListening();
+      };
+
+      recognition.onend = () => {
+        if (isListening) {
+          try { recognition.start(); } catch(e) {}
+        }
+      };
+    }
+
+    function toggleListening() {
+      if (!recognition) return;
+      if (isListening) {
+        stopListening();
+      } else {
+        startListening();
+      }
+    }
+
+    function startListening() {
+      isListening = true;
+      try { 
+        recognition.start(); 
+        voiceBtn.classList.add('text-red-500');
+        voiceBtn.classList.remove('text-slate-500', 'dark:text-slate-500');
+        voiceRipple.classList.add('animate-pulse-fast', 'opacity-20');
+        textInput.placeholder = "Listening...";
+      } catch(e) {}
+    }
+
+    function stopListening() {
+      isListening = false;
+      try { 
+        recognition.stop(); 
+        voiceBtn.classList.remove('text-red-500');
+        voiceRipple.classList.remove('animate-pulse-fast', 'opacity-20');
+        textInput.placeholder = "Type or say 'Hey AI'...";
+      } catch(e) {}
+    }
+
+    voiceBtn.onclick = toggleListening;
+
+    // ---------- INTENT CATEGORIES ----------
+    const intents = [
+      { category: 'time', keywords: ['time','clock','date','today'] },
+      { category: 'note', keywords: ['note','write','save', 'remember'] },
+      { category: 'task', keywords: ['task','todo','remind', 'list'] },
+      { category: 'joke', keywords: ['joke','funny','laugh', 'humor'] },
+      { category: 'quote', keywords: ['quote','inspire','motivate', 'wisdom'] },
+      { category: 'battery', keywords: ['battery','power','charge'] },
+      { category: 'help', keywords: ['help','commands','what can you do', 'features'] },
+      { category: 'clear', keywords: ['clear','delete all','remove', 'reset'] },
+    ];
+
+    async function detectIntent(text) {
+      if (!classifier) return 'unknown';
+      const candidateLabels = intents.map(i => i.category);
+      try {
+        const result = await classifier(text, candidateLabels);
+        const topLabel = result.labels[0];
+        const confidence = result.scores[0];
+        return confidence > 0.4 ? topLabel : 'unknown';
+      } catch (err) {
+        console.error('Classification error', err);
+        return 'unknown';
+      }
+    }
+
+    // ---------- INTENT HANDLERS ----------
+    function handleTime() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+      const dateStr = now.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+      const response = `🕒 It's **${timeStr}** on ${dateStr}.`;
+      addMessage(response, 'assistant');
+      speak(`It is ${timeStr}`);
+    }
+
+    async function handleNote(text) {
+      const noteContent = text.replace(/^(note|write|save|remember that)\s*/i, '').trim();
+      if (!noteContent || noteContent === text) { 
+        addMessage('What would you like me to note down?', 'assistant'); 
+        speak('What would you like me to note down?');
+        return; 
+      }
+      await dbAdd('notes', { content: noteContent, created: Date.now() });
+      addMessage(`📝 Noted: "${noteContent}"`, 'assistant');
+      speak('Saved to your notes.');
+    }
+
+    async function handleTask(text) {
+      if (text.match(/remind\s*me\s*in/i)) return handleReminder(text);
+      
+      const taskContent = text.replace(/^(add|create)?\s*(task|todo|remind\s*me\s*to)\s*/i, '').trim();
+      if (!taskContent || taskContent === text) { 
+        addMessage('What task should I add to your list?', 'assistant'); 
+        speak('What task should I add?');
+        return; 
+      }
+      await dbAdd('tasks', { content: taskContent, done: false, created: Date.now() });
+      addMessage(`✅ Added to tasks: **${taskContent}**`, 'assistant');
+      speak('Task added successfully.');
+    }
+
+    async function handleReminder(text) {
+      const matchIn = text.match(/in\s+(\d+)\s*(second|sec|minute|min|hour|hr)s?/i);
+      if (matchIn) {
+        const amount = parseInt(matchIn[1]);
+        const unit = matchIn[2].toLowerCase();
+        let ms = 0;
+        if (unit.startsWith('sec')) ms = amount * 1000;
+        else if (unit.startsWith('min')) ms = amount * 60000;
+        else if (unit.startsWith('hour') || unit.startsWith('hr')) ms = amount * 3600000;
+        
+        if (ms > 0 && ms <= 86400000) {
+          const action = text.replace(/remind\s*me\s*in\s+\d+\s*\w+/i, '').replace(/to\s+/i,'').trim() || "Reminder";
+          
+          await dbAdd('reminders', { text: action, ms, created: Date.now() });
+          addMessage(`⏰ I'll remind you to **${action}** in ${amount} ${unit}.`, 'assistant');
+          speak(`Reminder set for ${amount} ${unit}`);
+          
+          setTimeout(() => {
+            if (Notification.permission === 'granted') {
+              new Notification('AI Reminder', { body: action, icon: '🔔' });
+            }
+            addMessage(`🔔 **Reminder:** ${action}`, 'assistant');
+            speak(`Reminder: ${action}`);
+          }, ms);
+        }
+      } else {
+        addMessage('Please specify a time format like "Remind me to call John in 10 minutes".', 'assistant');
+      }
+    }
+
+    function handleJoke() {
+      const jokes = [
+        "Why don't scientists trust atoms? Because they make up everything!",
+        "I told my computer I needed a break... now it won't stop sending me KitKat ads.",
+        "Why did the AI cross the road? To optimize the pathfinding algorithm.",
+        "There are 10 types of people in the world: those who understand binary, and those who don't."
+      ];
+      const joke = jokes[Math.floor(Math.random() * jokes.length)];
+      addMessage(`😂 ${joke}`, 'assistant');
+      speak(joke);
+    }
+
+    function handleQuote() {
+      const quotes = [
+        "The best way to predict the future is to invent it. – Alan Kay",
+        "It's not a bug, it's an undocumented feature. – Anonymous",
+        "First, solve the problem. Then, write the code. – John Johnson",
+        "Simplicity is the soul of efficiency. – Austin Freeman"
+      ];
+      const quote = quotes[Math.floor(Math.random() * quotes.length)];
+      addMessage(`✨ ${quote}`, 'assistant');
+      speak(quote.split('–')[0]); // Only speak the quote part
+    }
+
+    async function handleBattery() {
+      if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        const level = Math.round(battery.level * 100);
+        const charging = battery.charging ? 'charging ⚡' : 'not charging';
+        addMessage(`🔋 Your battery is at **${level}%** and is currently ${charging}.`, 'assistant');
+        speak(`Battery is at ${level} percent.`);
+      } else {
+        addMessage('Battery information is not available on this device/browser.', 'assistant');
+      }
+    }
+
+    function handleHelp() {
+      const helpText = `
+        I can help you with several things right on your device! Try asking:
+        <br>• 🕒 **"What time is it?"**
+        <br>• 📝 **"Note that I parked in section 4"**
+        <br>• ✅ **"Add a task to buy groceries"**
+        <br>• ⏰ **"Remind me to stretch in 5 minutes"**
+        <br>• 😂 **"Tell me a joke"**
+        <br>• 🔋 **"What's my battery level?"**
+        <br>• 🗑️ **"Clear my notes/tasks"**
+      `;
+      addMessage(helpText, 'assistant');
+      speak("Here are some things you can ask me to do.");
+    }
+
+    async function handleClear(text) {
+      if (text.includes('task')) {
+        await dbClear('tasks');
+        addMessage('🗑️ All tasks have been cleared.', 'assistant');
+        speak('Tasks cleared.');
+      } else if (text.includes('note')) {
+        await dbClear('notes');
+        addMessage('🗑️ All notes have been cleared.', 'assistant');
+        speak('Notes cleared.');
+      } else {
+        addMessage('Please specify what you want to clear (e.g., "clear my tasks" or "clear notes").', 'assistant');
+      }
+    }
+
+    // ---------- MAIN MESSAGE PROCESSING ----------
+    async function processMessage(rawText) {
+      if (!classifier) {
+        addMessage('⏳ I am still loading my intelligence model. Please wait a moment...', 'assistant');
+        return;
+      }
+
+      const text = rawText.trim();
+      const intent = await detectIntent(text);
+      
+      // Execute based on intent, with fallback logic
+      switch (intent) {
+        case 'time': return handleTime();
+        case 'note': return handleNote(text);
+        case 'task': return handleTask(text);
+        case 'joke': return handleJoke();
+        case 'quote': return handleQuote();
+        case 'battery': return handleBattery();
+        case 'help': return handleHelp();
+        case 'clear': return handleClear(text);
+        default:
+          // Heuristic Fallback
+          const lowerText = text.toLowerCase();
+          if (lowerText.includes('time') || lowerText.includes('date')) return handleTime();
+          if (lowerText.includes('joke')) return handleJoke();
+          if (lowerText.includes('hello') || lowerText.includes('hi ')) {
+             addMessage("Hello there! How can I help you today?", "assistant");
+             speak("Hello! How can I help?");
+             return;
+          }
+          if (lowerText.includes('thank')) {
+             addMessage("You're very welcome!", "assistant");
+             speak("You're welcome!");
+             return;
+          }
+          addMessage("I'm not entirely sure how to help with that yet. Try saying **'Help'** to see what I can do.", 'assistant');
+          speak("I'm not sure about that. Say help to see my capabilities.");
+      }
+    }
+
+    // ---------- INITIALIZATION ----------
+    async function init() {
+      // 1. Initialize DB & Service Worker
+      await openDB().catch(e => console.error(e));
+      registerSW();
+      initRecognition();
+
+      // 2. Battery Monitoring
+      if ('getBattery' in navigator) {
+        const battery = await navigator.getBattery();
+        function updateBatteryUI() {
+          const level = Math.round(battery.level * 100);
+          batteryIndicator.textContent = `${level}%`;
+          
+          if (battery.charging) {
+             batteryContainer.innerHTML = `<i data-lucide="zap" class="w-4 h-4 text-amber-500"></i><span id="batteryIndicator">${level}%</span>`;
+          } else if (level < 20) {
+             batteryContainer.innerHTML = `<i data-lucide="battery-warning" class="w-4 h-4 text-red-500"></i><span id="batteryIndicator">${level}%</span>`;
+          } else {
+             batteryContainer.innerHTML = `<i data-lucide="battery" class="w-4 h-4"></i><span id="batteryIndicator">${level}%</span>`;
+          }
+          lucide.createIcons();
+        }
+        updateBatteryUI();
+        battery.addEventListener('levelchange', updateBatteryUI);
+        battery.addEventListener('chargingchange', updateBatteryUI);
+      } else {
+        document.getElementById('batteryContainer').style.display = 'none';
+      }
+
+      // 3. Request Notifications
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+
+      // 4. Initial Greeting
+      setTimeout(() => {
+        addMessage('👋 Hello! I am your on-device AI assistant. All processing happens locally for your privacy.', 'assistant');
+      }, 500);
+
+      // 5. Load Transformer Model
+      try {
+        progressContainer.classList.remove('hidden');
+        
+        classifier = await pipeline('zero-shot-classification', 'Xenova/distilbert-base-uncased-mnli', {
+          progress_callback: (x) => {
+            if (x.status === 'progress' && x.progress) {
+              progressBar.style.width = `${x.progress}%`;
+              modelStatus.textContent = `Downloading AI... ${Math.round(x.progress)}%`;
+            } else if (x.status === 'ready') {
+              modelStatus.innerHTML = `<span class="text-emerald-500 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Ready</span>`;
+              progressContainer.classList.add('hidden');
+              sendBtn.disabled = false;
+              lucide.createIcons();
+            }
+          }
+        });
+        
+        // Fallback if progress callback doesn't fire completely
+        modelStatus.innerHTML = `<span class="text-emerald-500 flex items-center gap-1"><i data-lucide="check-circle-2" class="w-3 h-3"></i> Ready</span>`;
+        progressContainer.classList.add('hidden');
+        sendBtn.disabled = false;
+        lucide.createIcons();
+        
+      } catch (e) {
+        console.error(e);
+        modelStatus.innerHTML = `<span class="text-red-500 flex items-center gap-1"><i data-lucide="alert-triangle" class="w-3 h-3"></i> Offline Mode</span>`;
+        progressContainer.classList.add('hidden');
+        sendBtn.disabled = false;
+        lucide.createIcons();
+        addMessage('⚠️ *Note: The advanced AI intent model failed to download (likely a network issue). I will rely on basic keyword matching for now.*', 'assistant');
+      }
+    }
+
+    // ---------- EVENT LISTENERS ----------
+    textInput.addEventListener('input', () => {
+      sendBtn.disabled = textInput.value.trim().length === 0;
+    });
+
+    sendBtn.onclick = () => {
+      const msg = textInput.value.trim();
+      if (msg) {
+        addMessage(msg, 'user');
+        processMessage(msg);
+        textInput.value = '';
+        sendBtn.disabled = true;
+      }
+    };
+
+    textInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && textInput.value.trim().length > 0) {
+        sendBtn.click();
+      }
+    });
+
+    // Start Initialization
+    init();
+
+  </script>
+
+  <!-- Add CSS animations -->
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</body>
+</html>
+
+```
